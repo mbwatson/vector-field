@@ -1,0 +1,24 @@
+{
+  "name": "vector-field-simulator",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "benchmark:particles": "npm run build && node tests/performance/particle-benchmark.mjs",
+    "deploy-local": "npm run build && rsync -avz --delete dist/ raspberrypi:/var/www/html/vectorfield/",
+    "test": "vitest run src",
+    "test:browser": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "vite": "^7.0.0",
+    "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.3.1",
+    "p5": "^2.3.0"
+  }
+}

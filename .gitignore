@@ -1,2 +1,5 @@
-.sass-cache/
-*.css.map
+node_modules/
+dist/
+playwright-report/
+test-results/
+notes.md

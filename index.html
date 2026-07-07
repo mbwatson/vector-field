@@ -1,44 +1,316 @@
 <!DOCTYPE html>
-<meta charset="utf-8"/>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-  <title>Vector Field</title>
-  <script src="assets/js/lib/p5.min.js" type="text/javascript"></script>
-  <script src="assets/js/lib/p5.dom.js" type="text/javascript"></script>
-  <script src="assets/js/plane.js" type="text/javascript"></script>
-  <script src="assets/js/particle.js" type="text/javascript"></script>
-  <script src="assets/js/particleSystem.js" type="text/javascript"></script>
-  <script src="assets/js/vectorField.js" type="text/javascript"></script>
-  <script src="assets/js/main.js" type="text/javascript"></script>
-  <script defer src="https://use.fontawesome.com/releases/v5.0.10/js/all.js" integrity="sha384-slN8GvtUJGnv6ca26v8EzVaR9DC58QEwsIk9q1QXdCU8Yu8ck/tL/5szYlBbqmS+" crossorigin="anonymous"></script>
-  <link href="https://fonts.googleapis.com/css?family=Tajawal" rel="stylesheet">
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
-  <link rel="stylesheet" href="assets/css/style.css">
-  <script type="text/x-mathjax-config">
-    MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}});
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Vector Field Simulator</title>
+  
+  <!-- CSS Stylesheets -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- App JS Entry Point -->
+  <script type="module" src="/src/main.js"></script>
+  
+  <!-- MathJax Configuration and Script -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$','$'], ['\\(','\\)']],
+        processEscapes: true
+      },
+      options: {
+        enableMenu: false
+      }
+    };
   </script>
-  <script type="text/javascript" async
-    src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-MML-AM_CHTML">
-  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-chtml.js"></script>
 </head>
 <body>
-  <div id="container">
-    <header>
-      <div class="title">Vector Field Visualization</div>
-      <div class="function"></div>
-    </header>
-    <div id="planeContainer"></div>
-    <div id="controls">
-      <button class="btn btn-success" id="playPause"><i class="fas fa-play"></i></i></button>
-      <button class="btn btn-danger" id="clearParticles"><i class="fas fa-trash-alt"></i></i></button>
-      <button class="btn btn-warning" id="respawnParticles"><i class="fas fa-redo-alt"></i></button>
-      <button class="btn btn-primary" id="toggleParticles"><i class="fas fa-eye"></i></button>
-      <button class="btn btn-primary" id="toggleVectors"><i class="fas fa-arrow-right"></i></button>
-      <button class="btn btn-primary" id="toggleAxes"><i class="fas fa-arrows-alt"></i></button>
-      <button class="btn btn-primary" id="toggleGrid"><i class="fas fa-th"></i></button>
-    </div>
-    <div id="presets"></div>
+  <div class="app-layout">
+    <!-- Main visualization viewport area -->
+    <main class="viewport-area">
+      <!-- Floating Glassmorphic Header -->
+      <header id="mathHeader" class="floating-header">
+        <div class="function-editor-row">
+          <span class="function-editor-spacer" aria-hidden="true"></span>
+          <div class="function-panel" data-notation="component">
+            <span class="fn-notation">F(x,y) =</span>
+            <span class="function-expression">
+              <span class="fn-bracket notation-component" aria-hidden="true">&#10216;</span>
+              <span class="fn-coordinate fn-coordinate-x">
+                <span class="fn-part" id="partX" tabindex="0" role="button" aria-label="Edit X component" title="Click to edit"></span>
+                <span class="fn-comma notation-component" aria-hidden="true">,</span>
+                <span class="fn-basis notation-basis" aria-hidden="true"><i>i</i> +</span>
+              </span>
+              <span class="fn-coordinate fn-coordinate-y">
+                <span class="fn-part" id="partY" tabindex="0" role="button" aria-label="Edit Y component" title="Click to edit"></span>
+                <span class="fn-basis notation-basis" aria-hidden="true"><i>j</i></span>
+              </span>
+              <span class="fn-bracket notation-component" aria-hidden="true">&#10217;</span>
+            </span>
+          </div>
+          <button id="openPresetsBtn" class="btn btn-action preset-trigger" type="button" aria-haspopup="dialog" aria-controls="presetDialog">
+            <i class="fas fa-th-large" aria-hidden="true"></i>
+            <span>Presets</span>
+          </button>
+        </div>
+        <div id="fnError" class="error-panel"></div>
+      </header>
+
+      <!-- Canvas Container -->
+      <div id="canvasContainer">
+        <!-- Canvas gets injected here by setup() -->
+        <div id="zoomHud" class="hud-overlay">Range: [-5, 5] &times; [-5, 5]</div>
+        <div id="paintHud" class="hud-overlay-center">Click & drag to paint particles</div>
+        <div id="magnitudeLegend" class="magnitude-legend" aria-label="Relative vector magnitude in the current view" hidden>
+          <span class="magnitude-legend-title">Relative magnitude</span>
+          <div class="magnitude-color-scale" aria-hidden="true"></div>
+          <div class="magnitude-length-scale" aria-hidden="true">
+            <span class="length-sample length-sample-low"></span>
+            <span class="length-sample length-sample-high"></span>
+          </div>
+          <div class="magnitude-legend-labels"><span>Low</span><span>High</span></div>
+        </div>
+      </div>
+
+      <!-- Floating simulation controls -->
+      <div class="action-tray" aria-label="Simulation actions">
+        <div class="action-buttons">
+          <button class="btn btn-action" id="playPause" title="Play/Pause (P)" aria-label="Play or pause simulation" aria-keyshortcuts="P">
+            <i class="fas fa-play"></i> <span>Play</span>
+          </button>
+          <button class="btn btn-action" id="respawnParticles" title="Seed particle grid (G)" aria-label="Populate visible plane with particle grid" aria-keyshortcuts="G">
+            <i class="fas fa-braille"></i> <span>Seed Grid</span>
+          </button>
+          <button class="btn btn-action" id="clearParticles" title="Clear particles (C)" aria-label="Clear particles" aria-keyshortcuts="C">
+            <i class="fas fa-trash-alt"></i> <span>Clear</span>
+          </button>
+        </div>
+        <div class="action-buttons">
+          <button id="shareLink" class="btn btn-action" type="button" aria-label="Copy a link to this vector field" title="Share this vector field">
+            <i class="fas fa-share-alt"></i>
+          </button>
+          <button id="openHelpBtn" class="btn btn-action" type="button" aria-label="Open instructions" title="How to use the simulator (?)" aria-keyshortcuts="?">
+            <i class="fas fa-question"></i>
+          </button>
+          <button id="toggleDrawerBtn" class="hud-btn" aria-label="Toggle settings panel" title="Toggle settings panel (S)" aria-keyshortcuts="S" aria-expanded="true" aria-controls="controlDrawer">
+            <i class="fas fa-sliders-h"></i>
+          </button>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Collapsible settings drawer/sidebar -->
+    <aside id="controlDrawer" class="sidebar">
+      <div class="sidebar-header">
+        <div>
+          <h1 class="app-title">Vector Field Simulator</h1>
+          <h2>Settings</h2>
+        </div>
+        <button id="closeDrawerBtn" class="close-btn" aria-label="Close settings panel" title="Close settings panel">&times;</button>
+      </div>
+      
+      <div class="sidebar-body">
+        <section class="sidebar-section">
+          <h3>Display</h3>
+          <div class="toggle-buttons">
+            <button class="btn btn-toggle" id="toggleParticles" title="Toggle Particles">
+              <i class="fas fa-eye"></i> Particles
+            </button>
+            <button class="btn btn-toggle" id="toggleVectors" title="Toggle vectors (V)" aria-keyshortcuts="V">
+              <i class="fas fa-arrow-right"></i> Vectors
+            </button>
+            <button class="btn btn-toggle" id="toggleAxes" title="Toggle axes (A)" aria-keyshortcuts="A">
+              <i class="fas fa-arrows-alt"></i> Axes
+            </button>
+            <button class="btn btn-toggle" id="toggleGrid" title="Toggle grid lines (L)" aria-keyshortcuts="L">
+              <i class="fas fa-th"></i> Grid
+            </button>
+          </div>
+        </section>
+
+        <section class="sidebar-section">
+          <h3>Simulation</h3>
+          <div class="parameter-slider">
+            <div class="slider-info">
+              <label for="speedSlider">Speed</label>
+              <span id="speedValue">1.00</span>
+            </div>
+            <input type="range" id="speedSlider" min="0" max="4.0" step="0.05" value="1.00">
+          </div>
+
+        </section>
+
+        <section class="sidebar-section">
+          <h3>Particles</h3>
+          <div class="parameter-control">
+            <label for="particleColorMode">Color</label>
+            <div class="select-container">
+              <select id="particleColorMode">
+                <option value="uniform">Uniform</option>
+                <option value="magnitude">Field magnitude</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="particleUniformColorControl" class="solid-preset-grid" role="group" aria-label="Uniform particle color">
+            <button type="button" class="solid-preset" data-color="#ec4899" style="--preset-color: #ec4899" aria-label="Pink" title="Pink"><span>Pink</span></button>
+            <button type="button" class="solid-preset" data-color="#00b8c4" style="--preset-color: #00b8c4" aria-label="Cyan" title="Cyan"><span>Cyan</span></button>
+            <button type="button" class="solid-preset" data-color="#8b5cf6" style="--preset-color: #8b5cf6" aria-label="Violet" title="Violet"><span>Violet</span></button>
+            <button type="button" class="solid-preset" data-color="#f97316" style="--preset-color: #f97316" aria-label="Orange" title="Orange"><span>Orange</span></button>
+          </div>
+
+          <div class="parameter-slider">
+            <div class="slider-info">
+              <label for="particleSizeSlider">Size</label>
+              <span id="particleSizeValue">8px</span>
+            </div>
+            <input type="range" id="particleSizeSlider" min="2" max="20" step="1" value="8">
+          </div>
+
+          <div class="parameter-slider">
+            <div class="slider-info">
+              <label for="particleSpacingSlider">Seed Grid Spacing</label>
+              <span id="particleSpacingValue">0.50</span>
+            </div>
+            <input type="range" id="particleSpacingSlider" min="0.25" max="2.0" step="0.05" value="0.50">
+          </div>
+        </section>
+
+        <section class="sidebar-section">
+          <h3>Vector Arrows</h3>
+          <div class="parameter-control">
+            <label for="vectorMagnitudeMode">Magnitude Encoding</label>
+            <div class="select-container">
+              <select id="vectorMagnitudeMode">
+                <option value="color">Color</option>
+                <option value="length">Length</option>
+                <option value="uniform">Uniform</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="vectorColorControls" class="gradient-preset-grid" role="group" aria-label="Vector magnitude color palette">
+            <button type="button" class="gradient-preset" data-low-color="#00f2fe" data-high-color="#ec4899" style="--preset-low: #00f2fe; --preset-high: #ec4899"><span class="gradient-preset-preview"></span><span>Cyan · Pink</span></button>
+            <button type="button" class="gradient-preset" data-low-color="#440154" data-high-color="#fde725" style="--preset-low: #440154; --preset-high: #fde725"><span class="gradient-preset-preview"></span><span>Viridis</span></button>
+            <button type="button" class="gradient-preset" data-low-color="#2563eb" data-high-color="#ef4444" style="--preset-low: #2563eb; --preset-high: #ef4444"><span class="gradient-preset-preview"></span><span>Blue · Red</span></button>
+            <button type="button" class="gradient-preset" data-low-color="#334155" data-high-color="#e2e8f0" style="--preset-low: #334155; --preset-high: #e2e8f0"><span class="gradient-preset-preview"></span><span>Monochrome</span></button>
+          </div>
+
+          <div class="parameter-slider">
+            <div class="slider-info">
+              <label for="vectorSpacingSlider">Spacing</label>
+              <span id="vectorSpacingValue">0.50</span>
+            </div>
+            <input type="range" id="vectorSpacingSlider" min="0.25" max="2.0" step="0.05" value="0.50">
+          </div>
+        </section>
+
+        <section class="sidebar-section">
+          <h3>Appearance</h3>
+          <div class="parameter-control">
+            <label for="themeSelect">Theme</label>
+            <div class="select-container">
+              <select id="themeSelect">
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+              </select>
+            </div>
+          </div>
+          <div class="parameter-control">
+            <label for="notationSelect">Function Notation</label>
+            <div class="select-container">
+              <select id="notationSelect">
+                <option value="component">Component · ⟨P, Q⟩</option>
+                <option value="basis">Basis vectors · P i + Q j</option>
+              </select>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Footer Info -->
+      <footer class="sidebar-footer">
+        <a class="sidebar-footer-action" href="https://www.github.com/mbwatson/vectorField" target="_blank" rel="noopener noreferrer" aria-label="View source on GitHub" title="View source on GitHub">
+          <i class="fab fa-github"></i>
+        </a>
+      </footer>
+    </aside>
   </div>
-  <footer><a href="https://www.github.com/mbwatson/vectorField" target="_blank"><i class="fab fa-github"></i></a></footer>
+
+  <dialog id="presetDialog" class="help-dialog preset-dialog" aria-labelledby="presetDialogTitle">
+    <div class="help-dialog-header">
+      <div>
+        <p class="help-eyebrow">Examples</p>
+        <h2 id="presetDialogTitle">Choose a vector field</h2>
+      </div>
+      <button id="closePresetsBtn" class="close-btn help-close-btn" type="button" aria-label="Close presets" title="Close presets">&times;</button>
+    </div>
+    <div id="presetDialogBody" class="preset-dialog-body"></div>
+  </dialog>
+
+  <dialog id="helpDialog" class="help-dialog" aria-labelledby="helpDialogTitle">
+    <div class="help-dialog-header">
+      <div>
+        <p class="help-eyebrow">Quick start</p>
+        <h2 id="helpDialogTitle">Explore the vector field</h2>
+      </div>
+      <button id="closeHelpBtn" class="close-btn help-close-btn" type="button" aria-label="Close instructions" title="Close instructions">&times;</button>
+    </div>
+
+    <div class="help-dialog-body">
+      <section class="help-section">
+        <div class="help-section-icon"><i class="fas fa-paint-brush"></i></div>
+        <div>
+          <h3>Draw and animate</h3>
+          <p>Click or drag on the plane to place particles. Use <strong>Play</strong>, <strong>Seed Grid</strong>, and <strong>Clear</strong> to experiment with their motion.</p>
+        </div>
+      </section>
+
+      <section class="help-section">
+        <div class="help-section-icon"><i class="fas fa-keyboard"></i></div>
+        <div>
+          <h3>Keyboard shortcuts</h3>
+          <p><kbd>P</kbd> play/pause · <kbd>C</kbd> clear · <kbd>G</kbd> seed grid · <kbd>V</kbd> vectors · <kbd>L</kbd> grid · <kbd>A</kbd> axes · <kbd>S</kbd> settings · <kbd>?</kbd> help · <kbd>Esc</kbd> close or cancel</p>
+        </div>
+      </section>
+
+      <section class="help-section">
+        <div class="help-section-icon"><i class="fas fa-edit"></i></div>
+        <div>
+          <h3>Change the field</h3>
+          <p>Click either component of <strong id="notationHelpExample">F(x,y) = ⟨P(x,y), Q(x,y)⟩</strong> to edit it. Press <kbd>Enter</kbd> to apply or <kbd>Escape</kbd> to cancel. Use <strong>Presets</strong> in the function editor to choose an example field.</p>
+        </div>
+      </section>
+
+      <section class="help-section">
+        <div class="help-section-icon"><i class="fas fa-search"></i></div>
+        <div>
+          <h3>Explore the plane</h3>
+          <p>Scroll or pinch to zoom. Pan with a right-button drag, middle-button drag, or <kbd>Space</kbd> + drag. On touchscreens, drag with two fingers.</p>
+        </div>
+      </section>
+
+      <section class="help-section">
+        <div class="help-section-icon"><i class="fas fa-sliders-h"></i></div>
+        <div>
+          <h3>Customize and share</h3>
+          <p>Vector arrows can show relative magnitude in the current view through color or length, or use a uniform direction-only style. Share copies only the current vector field, so recipients keep their own preferences.</p>
+        </div>
+      </section>
+
+      <details class="syntax-help">
+        <summary>Supported math syntax</summary>
+        <div class="syntax-help-content">
+          <p>Use <code>x</code>, <code>y</code>, the operators <code>+ - * / ^</code>, and the constants <code>pi</code> and <code>e</code>.</p>
+          <p>Functions include <code>sin</code>, <code>cos</code>, <code>tan</code>, <code>sec</code>, <code>csc</code>, <code>cot</code>, inverse and hyperbolic trig functions, <code>exp</code>, <code>ln</code>, <code>log</code>, <code>sqrt</code>, and <code>abs</code>.</p>
+          <p>Implicit multiplication works too: <code>2x</code>, <code>xy</code>, <code>2sin(x)</code>, and <code>(x+1)(x-1)</code>.</p>
+        </div>
+      </details>
+    </div>
+  </dialog>
 </body>
 </html>
