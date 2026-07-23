@@ -35,6 +35,7 @@ let hovering = false;
 let inspectorPointerType = null;
 let inspectorPoint = null;
 let inspectorFrame = null;
+let interactionMode = 'paint';
 const queryParameters = new URLSearchParams(window.location.search);
 const particleBenchmark = queryParameters.has('benchmark')
 	? new ParticleBenchmark()
@@ -47,15 +48,17 @@ let startPanMouseX = 0;
 let startPanMouseY = 0;
 let startPanOffset = { x: 0, y: 0 };
 let isSpacePressed = false;
+let mouseGestureAction = null;
 
-// Mobile touch state. A single finger paints particles; two fingers pan and
-// pinch-zoom around their midpoint.
+// Mobile touch state. A single finger uses the active Paint/Inspect tool;
+// two fingers pan and pinch-zoom around their midpoint.
 let touchGesture = null;
 let touchStartPoint = null;
 let touchPaintMoved = false;
 let touchGestureOccurred = false;
 let pendingTouchPoints = null;
 let touchGestureFrame = null;
+let touchGestureMode = null;
 const activeCanvasTouches = new Map();
 
 // Toggles
@@ -337,7 +340,7 @@ function draw() {
 	// Update paint HUD overlay visibility
 	const paintHud = document.getElementById('paintHud');
 	if (paintHud) {
-		if (showParticles && system.particles.length === 0) {
+		if (interactionMode === 'paint' && showParticles && system.particles.length === 0) {
 			paintHud.classList.add('visible');
 		} else {
 			paintHud.classList.remove('visible');
@@ -356,9 +359,13 @@ function draw() {
 }
 
 function inspectorIsActive() {
-	return preferences.showInspector && hovering && inspectorPointerType !== 'touch' &&
-		!isPanning && !p.mouseIsPressed && activeCanvasTouches.size === 0 &&
-		!document.querySelector('.fn-edit');
+	if (interactionMode !== 'inspect' || !inspectorPoint || isPanning || document.querySelector('.fn-edit')) {
+		return false;
+	}
+	if (inspectorPointerType === 'touch') {
+		return activeCanvasTouches.size <= 1 && !touchGestureOccurred;
+	}
+	return hovering && !p.mouseIsPressed && activeCanvasTouches.size === 0;
 }
 
 function formatInspectorNumber(value) {
@@ -532,6 +539,7 @@ function isMouseInCanvas() {
 function mousePressed() {
 	if (hovering) requestRender();
 	if (hovering && (p.mouseButton.center || p.mouseButton.right || isSpacePressed || p.keyIsDown(32))) {
+		mouseGestureAction = 'pan';
 		isPanning = true;
 		startPanMouseX = p.mouseX;
 		startPanMouseY = p.mouseY;
@@ -544,6 +552,8 @@ function mousePressed() {
 				canvas.addEventListener('contextmenu', preventDefault, { once: true });
 			}
 		}
+	} else if (hovering) {
+		mouseGestureAction = interactionMode;
 	}
 }
 
@@ -553,9 +563,10 @@ function mouseReleased() {
 }
 
 function mouseClicked() {
-	if (isMouseInCanvas() && hovering && !isPanning) {
+	if (mouseGestureAction === 'paint' && interactionMode === 'paint' && isMouseInCanvas() && hovering) {
 		addParticle(mouseXCoordinate(), mouseYCoordinate());
 	}
+	mouseGestureAction = null;
 }
 
 function mouseDragged() {
@@ -571,7 +582,7 @@ function mouseDragged() {
 		f.vectors = f.newVectors();
 		redrawBackground();
 		showExtentHUD();
-	} else if (isMouseInCanvas() && hovering) {
+	} else if (mouseGestureAction === 'paint' && interactionMode === 'paint' && isMouseInCanvas() && hovering) {
 		addParticle(mouseXCoordinate(), mouseYCoordinate());
 	}
 }
@@ -599,6 +610,8 @@ function beginTouchGesture(points = canvasTouchPoints()) {
 		panOffset,
 	});
 	touchGestureOccurred = true;
+	inspectorPoint = null;
+	requestRender();
 }
 
 function applyPendingTouchGesture() {
@@ -630,9 +643,16 @@ function touchStarted(event) {
 	if (points.length >= 2) {
 		beginTouchGesture(points);
 	} else if (points.length === 1) {
-		touchStartPoint = { x: point.x, y: point.y };
 		touchPaintMoved = false;
 		touchGestureOccurred = false;
+		touchGestureMode = interactionMode;
+		if (touchGestureMode === 'inspect') {
+			inspectorPoint = { x: point.x, y: point.y };
+			touchStartPoint = null;
+			requestInspectorRender();
+		} else {
+			touchStartPoint = { x: point.x, y: point.y };
+		}
 	}
 	return false;
 }
@@ -650,8 +670,13 @@ function touchMoved(event) {
 			touchGestureFrame = requestAnimationFrame(applyPendingTouchGesture);
 		}
 	} else if (currentPoints.length === 1 && !touchGestureOccurred) {
-		touchPaintMoved = true;
-		addParticle(plane.pixelToX(point.x), plane.pixelToY(point.y));
+		if (touchGestureMode === 'inspect') {
+			inspectorPoint = { x: point.x, y: point.y };
+			requestInspectorRender();
+		} else if (touchGestureMode === 'paint') {
+			touchPaintMoved = true;
+			addParticle(plane.pixelToX(point.x), plane.pixelToY(point.y));
+		}
 	}
 	return false;
 }
@@ -670,7 +695,7 @@ function touchEnded(event) {
 		touchGestureFrame = null;
 	}
 	if (activeCanvasTouches.size === 0) {
-		if (touchStartPoint && !touchPaintMoved && !touchGestureOccurred) {
+		if (touchGestureMode === 'paint' && interactionMode === 'paint' && touchStartPoint && !touchPaintMoved && !touchGestureOccurred) {
 			addParticle(
 				plane.pixelToX(touchStartPoint.x),
 				plane.pixelToY(touchStartPoint.y)
@@ -679,6 +704,8 @@ function touchEnded(event) {
 		touchStartPoint = null;
 		touchPaintMoved = false;
 		touchGestureOccurred = false;
+		touchGestureMode = null;
+		requestRender();
 	}
 	return false;
 }
@@ -994,8 +1021,22 @@ function updateToggleButtons() {
 	toggleAxesButton.setAttribute('aria-pressed', String(showAxes));
 	toggleGridButton.classList.toggle('active', showGrid);
 	toggleGridButton.setAttribute('aria-pressed', String(showGrid));
-	toggleInspectorButton.classList.toggle('active', preferences.showInspector);
-	toggleInspectorButton.setAttribute('aria-pressed', String(preferences.showInspector));
+}
+
+function setInteractionMode(mode) {
+	if (mouseGestureAction !== null) mouseGestureAction = 'cancelled';
+	if (activeCanvasTouches.size > 0) {
+		touchGestureMode = 'cancelled';
+		touchStartPoint = null;
+	}
+	interactionMode = mode;
+	const inspecting = mode === 'inspect';
+	toggleInspectorButton.classList.toggle('active', inspecting);
+	toggleInspectorButton.setAttribute('aria-pressed', String(inspecting));
+	toggleInspectorButton.title = inspecting ? 'Return to painting (I)' : 'Inspect field values (I)';
+	planeCanvas.classList.toggle('inspecting', inspecting);
+	if (!inspecting) inspectorPoint = null;
+	requestRender();
 }
 
 function setupUI(initialVectorFunction) {
@@ -1090,10 +1131,7 @@ function setupUI(initialVectorFunction) {
 		updateToggleButtons();
 	});
 	toggleInspectorButton.addEventListener('click', () => {
-		preferences = { ...preferences, showInspector: !preferences.showInspector };
-		savePreferences(preferences);
-		updateToggleButtons();
-		requestRender();
+		setInteractionMode(interactionMode === 'inspect' ? 'paint' : 'inspect');
 	});
 
 	// Hover Canvas states
@@ -1103,6 +1141,20 @@ function setupUI(initialVectorFunction) {
 			x: (event.clientX - rect.left) * p.width / rect.width,
 			y: (event.clientY - rect.top) * p.height / rect.height,
 		};
+	};
+	const cancelCanvasTouch = (event) => {
+		if (!activeCanvasTouches.delete(event.pointerId)) return;
+		if (touchGestureFrame !== null) cancelAnimationFrame(touchGestureFrame);
+		touchGesture = null;
+		pendingTouchPoints = null;
+		touchGestureFrame = null;
+		touchStartPoint = null;
+		touchPaintMoved = false;
+		touchGestureMode = activeCanvasTouches.size > 0 ? 'cancelled' : null;
+		touchGestureOccurred = activeCanvasTouches.size > 0;
+		inspectorPoint = null;
+		p.mouseIsPressed = false;
+		requestRender();
 	};
 	planeCanvas.addEventListener('pointerenter', (event) => {
 		hovering = true;
@@ -1114,14 +1166,15 @@ function setupUI(initialVectorFunction) {
 	planeCanvas.addEventListener('pointermove', (event) => {
 		inspectorPointerType = event.pointerType || 'mouse';
 		updateInspectorPoint(event);
-		if (inspectorPointerType !== 'touch') requestInspectorRender();
+		if (interactionMode === 'inspect' && inspectorPointerType !== 'touch') requestInspectorRender();
 	});
-	planeCanvas.addEventListener('pointerleave', () => {
+	planeCanvas.addEventListener('pointerleave', (event) => {
 		hovering = false;
-		inspectorPoint = null;
+		if (event.pointerType !== 'touch') inspectorPoint = null;
 		planeCanvas.classList.remove('hovering');
 		requestRender();
 	});
+	planeCanvas.addEventListener('pointercancel', cancelCanvasTouch);
 	
 	// Inline Math Clicking
 	partXEl.addEventListener('click', () => beginEdit('x'));
@@ -1331,6 +1384,7 @@ function setupUI(initialVectorFunction) {
 			p: () => playPauseButton.click(),
 			c: () => clearButton.click(),
 			g: () => respawnButton.click(),
+			i: () => toggleInspectorButton.click(),
 			v: () => toggleVectorsButton.click(),
 			l: () => toggleGridButton.click(),
 			a: () => toggleAxesButton.click(),
@@ -1354,6 +1408,7 @@ function setupUI(initialVectorFunction) {
 	// Setup initial UI active states
 	updatePlayPauseButton();
 	updateToggleButtons();
+	setInteractionMode('paint');
 	updateMagnitudeLegend();
 
 	// Render the shared field, or the default field when the URL did not provide one.

@@ -741,6 +741,17 @@ canvas {
   background: rgba(244, 63, 94, 0.05);
 }
 
+#toggleInspector.active {
+  color: var(--color-accent);
+  background: var(--accent-soft);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.15);
+}
+
+#plane.inspecting {
+  cursor: crosshair;
+}
+
 .toggle-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;

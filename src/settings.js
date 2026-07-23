@@ -18,7 +18,6 @@ const DEFAULT_PREFERENCES = Object.freeze({
 	showVectors: true,
 	showAxes: true,
 	showGrid: true,
-	showInspector: true,
 	inspectParticles: true,
 });
 
@@ -38,7 +37,6 @@ const validators = {
 	showVectors: isBoolean,
 	showAxes: isBoolean,
 	showGrid: isBoolean,
-	showInspector: isBoolean,
 	inspectParticles: isBoolean,
 };
 
