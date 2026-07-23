@@ -49,10 +49,11 @@ describe('preferences', () => {
 	});
 
 	it('loads and saves validated JSON under the versioned key', () => {
-		const storage = memoryStorage(JSON.stringify({ speed: 2.5, showAxes: false }));
+		const storage = memoryStorage(JSON.stringify({ speed: 2.5, showAxes: false, showInspector: false }));
 		const loaded = loadPreferences(storage);
 		expect(loaded.speed).toBe(2.5);
 		expect(loaded.showAxes).toBe(false);
+		expect(loaded.showInspector).toBe(false);
 
 		expect(savePreferences({ ...loaded, particleSize: 11 }, storage)).toBe(true);
 		expect(storage.setItem).toHaveBeenCalledWith(PREFERENCES_STORAGE_KEY, expect.any(String));

@@ -64,6 +64,7 @@
         <!-- Canvas gets injected here by setup() -->
         <div id="zoomHud" class="hud-overlay">Range: [-5, 5] &times; [-5, 5]</div>
         <div id="paintHud" class="hud-overlay-center">Click & drag to paint particles</div>
+        <div id="fieldInspector" class="field-inspector" aria-hidden="true" hidden></div>
         <div id="magnitudeLegend" class="magnitude-legend" aria-label="Relative vector magnitude in the current view" hidden>
           <span class="magnitude-legend-title">Relative magnitude</span>
           <div class="magnitude-color-scale" aria-hidden="true"></div>
@@ -128,6 +129,9 @@
             </button>
             <button class="btn btn-toggle" id="toggleGrid" title="Toggle grid lines (L)" aria-keyshortcuts="L">
               <i class="fas fa-th"></i> Grid
+            </button>
+            <button class="btn btn-toggle" id="toggleInspector" title="Toggle pointer inspection">
+              <i class="fas fa-crosshairs"></i> Inspector
             </button>
           </div>
         </section>

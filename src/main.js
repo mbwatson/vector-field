@@ -32,6 +32,9 @@ let preferences;
 let canvasTheme;
 let zoom = appDefaults.zoom;
 let hovering = false;
+let inspectorPointerType = null;
+let inspectorPoint = null;
+let inspectorFrame = null;
 const queryParameters = new URLSearchParams(window.location.search);
 const particleBenchmark = queryParameters.has('benchmark')
 	? new ParticleBenchmark()
@@ -78,7 +81,9 @@ let toggleParticlesButton;
 let toggleVectorsButton;
 let toggleAxesButton;
 let toggleGridButton;
+let toggleInspectorButton;
 let planeCanvas;
+let fieldInspectorEl;
 
 // Presets keep stable IDs and human-readable metadata while VectorFunction
 // remains the source of their compiled functions and display LaTeX.
@@ -289,6 +294,14 @@ function requestRender() {
 	if (!p.isLooping()) p.redraw();
 }
 
+function requestInspectorRender() {
+	if (p.isLooping() || inspectorFrame !== null) return;
+	inspectorFrame = requestAnimationFrame(() => {
+		inspectorFrame = null;
+		requestRender();
+	});
+}
+
 function requestParticleRender() {
 	if (!paused || (showParticles && system.hasSpawningParticles())) {
 		p.loop();
@@ -319,6 +332,7 @@ function draw() {
 		system.applyForce(f);
 		integrationEnd = particleBenchmark ? performance.now() : 0;
 	}
+	drawFieldInspector();
 
 	// Update paint HUD overlay visibility
 	const paintHud = document.getElementById('paintHud');
@@ -339,6 +353,88 @@ function draw() {
 	if (!particleBenchmark && paused && (!showParticles || !system.hasSpawningParticles())) {
 		p.noLoop();
 	}
+}
+
+function inspectorIsActive() {
+	return preferences.showInspector && hovering && inspectorPointerType !== 'touch' &&
+		!isPanning && !p.mouseIsPressed && activeCanvasTouches.size === 0 &&
+		!document.querySelector('.fn-edit');
+}
+
+function formatInspectorNumber(value) {
+	if (!Number.isFinite(value)) return 'undefined';
+	const rounded = Math.abs(value) < 0.005 ? 0 : value;
+	return rounded.toFixed(2);
+}
+
+function inspectorVectorLabel(x, y) {
+	if (!Number.isFinite(x) || !Number.isFinite(y)) return 'F(x, y) = undefined';
+	const xLabel = formatInspectorNumber(x);
+	const yLabel = formatInspectorNumber(y);
+	if (preferences.notation === 'basis') {
+		const sign = y < 0 ? '−' : '+';
+		return `F(x, y) = ${xLabel} i ${sign} ${formatInspectorNumber(Math.abs(y))} j`;
+	}
+	return `F(x, y) = ⟨${xLabel}, ${yLabel}⟩`;
+}
+
+function positionInspectorTooltip() {
+	const padding = 8;
+	const gap = 14;
+	const width = fieldInspectorEl.offsetWidth;
+	const height = fieldInspectorEl.offsetHeight;
+	const preferredLeft = inspectorPoint.x + gap;
+	const preferredTop = inspectorPoint.y + gap;
+	const left = preferredLeft + width <= p.width - padding
+		? preferredLeft
+		: inspectorPoint.x - width - gap;
+	const top = preferredTop + height <= p.height - padding
+		? preferredTop
+		: inspectorPoint.y - height - gap;
+	fieldInspectorEl.style.left = `${Math.max(padding, Math.min(left, p.width - width - padding))}px`;
+	fieldInspectorEl.style.top = `${Math.max(padding, Math.min(top, p.height - height - padding))}px`;
+}
+
+function drawInspectorVector(x, y, vectorX, vectorY, magnitude) {
+	const color = canvasTheme.hover;
+	p.push();
+	p.stroke(...color);
+	p.strokeWeight(2);
+	p.fill(...canvasTheme.background);
+	p.circle(x, y, 9);
+	if (Number.isFinite(magnitude) && magnitude > 0) {
+		const relativeMagnitude = Math.min(magnitude / f.maxMag, 1);
+		const length = 18 + 24 * relativeMagnitude;
+		const endX = x + vectorX / magnitude * length;
+		const endY = y - vectorY / magnitude * length;
+		p.line(x, y, endX, endY);
+		const angle = Math.atan2(endY - y, endX - x);
+		const arrowSize = 6;
+		p.line(endX, endY, endX - arrowSize * Math.cos(angle - Math.PI / 6), endY - arrowSize * Math.sin(angle - Math.PI / 6));
+		p.line(endX, endY, endX - arrowSize * Math.cos(angle + Math.PI / 6), endY - arrowSize * Math.sin(angle + Math.PI / 6));
+	}
+	p.pop();
+}
+
+function drawFieldInspector() {
+	if (!fieldInspectorEl || !inspectorIsActive()) {
+		if (fieldInspectorEl) fieldInspectorEl.hidden = true;
+		return;
+	}
+	const x = plane.pixelToX(inspectorPoint.x);
+	const y = plane.pixelToY(inspectorPoint.y);
+	// Keep evaluation in draw so pointer events can request frames freely without
+	// evaluating an expensive field more than once in any rendered frame.
+	const vector = f.eval({ x, y });
+	const magnitude = Math.hypot(vector.x, vector.y);
+	drawInspectorVector(inspectorPoint.x, inspectorPoint.y, vector.x, vector.y, magnitude);
+	fieldInspectorEl.textContent = [
+		`(x, y) = (${formatInspectorNumber(x)}, ${formatInspectorNumber(y)})`,
+		inspectorVectorLabel(vector.x, vector.y),
+		`|F| = ${formatInspectorNumber(magnitude)}`,
+	].join('\n');
+	fieldInspectorEl.hidden = false;
+	positionInspectorTooltip();
 }
 
 function recordBenchmarkFrame({ frameStart, backgroundEnd, particleRenderEnd, cullingEnd, integrationEnd }) {
@@ -434,6 +530,7 @@ function isMouseInCanvas() {
 }
 
 function mousePressed() {
+	if (hovering) requestRender();
 	if (hovering && (p.mouseButton.center || p.mouseButton.right || isSpacePressed || p.keyIsDown(32))) {
 		isPanning = true;
 		startPanMouseX = p.mouseX;
@@ -452,6 +549,7 @@ function mousePressed() {
 
 function mouseReleased() {
 	isPanning = false;
+	if (hovering) requestRender();
 }
 
 function mouseClicked() {
@@ -523,6 +621,8 @@ function applyPendingTouchGesture() {
 
 function touchStarted(event) {
 	if (!planeCanvas || event.target !== planeCanvas) return;
+	inspectorPointerType = 'touch';
+	requestRender();
 	const point = touchPointForEvent(event);
 	activeCanvasTouches.set(event.pointerId, point);
 	const points = canvasTouchPoints();
@@ -729,6 +829,7 @@ function applyNotation(notation) {
 	preferences = { ...preferences, notation };
 	updateNotationUI();
 	savePreferences(preferences);
+	requestRender();
 }
 
 function renderFunctionHeading() {
@@ -843,6 +944,7 @@ function beginEdit(part) {
 	span.appendChild(input);
 	input.focus();
 	input.select();
+	requestRender();
 	let finished = false;
 	
 	input.addEventListener('input', () => {
@@ -862,6 +964,7 @@ function beginEdit(part) {
 			finished = true;
 			clearFnError();
 			renderFunctionHeading();
+			requestRender();
 		}
 	});
 	
@@ -870,6 +973,7 @@ function beginEdit(part) {
 		finished = true;
 		if (!tryCommit(part, input.value)) {
 			renderFunctionHeading(); // revert to last valid
+			requestRender();
 		}
 	});
 }
@@ -890,6 +994,8 @@ function updateToggleButtons() {
 	toggleAxesButton.setAttribute('aria-pressed', String(showAxes));
 	toggleGridButton.classList.toggle('active', showGrid);
 	toggleGridButton.setAttribute('aria-pressed', String(showGrid));
+	toggleInspectorButton.classList.toggle('active', preferences.showInspector);
+	toggleInspectorButton.setAttribute('aria-pressed', String(preferences.showInspector));
 }
 
 function setupUI(initialVectorFunction) {
@@ -898,6 +1004,7 @@ function setupUI(initialVectorFunction) {
 	partYEl = document.getElementById('partY');
 	fnErrorEl = document.getElementById('fnError');
 	planeCanvas = document.getElementById('plane');
+	fieldInspectorEl = document.getElementById('fieldInspector');
 	
 	playPauseButton = document.getElementById('playPause');
 	clearButton = document.getElementById('clearParticles');
@@ -908,6 +1015,7 @@ function setupUI(initialVectorFunction) {
 	toggleVectorsButton = document.getElementById('toggleVectors');
 	toggleAxesButton = document.getElementById('toggleAxes');
 	toggleGridButton = document.getElementById('toggleGrid');
+	toggleInspectorButton = document.getElementById('toggleInspector');
 	
 	// Actions
 	playPauseButton.addEventListener('click', () => {
@@ -981,15 +1089,38 @@ function setupUI(initialVectorFunction) {
 		redrawBackground();
 		updateToggleButtons();
 	});
+	toggleInspectorButton.addEventListener('click', () => {
+		preferences = { ...preferences, showInspector: !preferences.showInspector };
+		savePreferences(preferences);
+		updateToggleButtons();
+		requestRender();
+	});
 
 	// Hover Canvas states
-	planeCanvas.addEventListener('mouseover', () => {
+	const updateInspectorPoint = (event) => {
+		const rect = planeCanvas.getBoundingClientRect();
+		inspectorPoint = {
+			x: (event.clientX - rect.left) * p.width / rect.width,
+			y: (event.clientY - rect.top) * p.height / rect.height,
+		};
+	};
+	planeCanvas.addEventListener('pointerenter', (event) => {
 		hovering = true;
+		inspectorPointerType = event.pointerType || 'mouse';
+		updateInspectorPoint(event);
 		planeCanvas.classList.add('hovering');
+		requestInspectorRender();
 	});
-	planeCanvas.addEventListener('mouseout', () => {
+	planeCanvas.addEventListener('pointermove', (event) => {
+		inspectorPointerType = event.pointerType || 'mouse';
+		updateInspectorPoint(event);
+		if (inspectorPointerType !== 'touch') requestInspectorRender();
+	});
+	planeCanvas.addEventListener('pointerleave', () => {
 		hovering = false;
+		inspectorPoint = null;
 		planeCanvas.classList.remove('hovering');
+		requestRender();
 	});
 	
 	// Inline Math Clicking

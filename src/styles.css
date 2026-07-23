@@ -445,6 +445,27 @@ canvas {
   opacity: 1;
 }
 
+.field-inspector {
+  position: absolute;
+  z-index: 6;
+  min-width: 190px;
+  padding: 9px 11px;
+  color: var(--text-main);
+  background: var(--hud-bg);
+  border: 1px solid var(--color-accent);
+  border-radius: 8px;
+  box-shadow: var(--shadow-panel);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.55;
+  white-space: pre;
+  pointer-events: none;
+}
+
+.field-inspector[hidden] {
+  display: none;
+}
+
 .magnitude-legend {
   --vector-low-color: #00f2fe;
   --vector-high-color: #ec4899;

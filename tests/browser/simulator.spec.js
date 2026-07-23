@@ -146,7 +146,7 @@ test('restores every existing preference-backed control after reload', async ({ 
 	await page.locator('#particleUniformColorControl [data-color="#f97316"]').click();
 	await page.locator('#particleColorMode').selectOption('magnitude');
 	await page.locator('#notationSelect').selectOption('basis');
-	for (const selector of ['#toggleParticles', '#toggleVectors', '#toggleAxes', '#toggleGrid']) {
+	for (const selector of ['#toggleParticles', '#toggleVectors', '#toggleAxes', '#toggleGrid', '#toggleInspector']) {
 		await page.locator(selector).click();
 	}
 
@@ -161,9 +161,85 @@ test('restores every existing preference-backed control after reload', async ({ 
 	await page.locator('#particleColorMode').selectOption('uniform');
 	await expect(page.locator('#particleUniformColorControl [data-color="#f97316"]')).toHaveAttribute('aria-pressed', 'true');
 	await expect(page.locator('#notationSelect')).toHaveValue('basis');
-	for (const selector of ['#toggleParticles', '#toggleVectors', '#toggleAxes', '#toggleGrid']) {
+	for (const selector of ['#toggleParticles', '#toggleVectors', '#toggleAxes', '#toggleGrid', '#toggleInspector']) {
 		await expect(page.locator(selector)).toHaveAttribute('aria-pressed', 'false');
 	}
+});
+
+test('inspects a field location without painting and stays inside the viewport', async ({ page }, testInfo) => {
+	test.skip(testInfo.project.name === 'mobile', 'Touch inspection is intentionally deferred');
+	await page.goto('/?fx=-y&fy=x');
+	await page.locator('#clearParticles').click();
+	const canvas = page.locator('#plane');
+	const box = await canvas.boundingBox();
+	if (!box) throw new Error('Canvas has no bounding box');
+	const x = box.x + box.width * 0.625;
+	const y = box.y + box.width * 0.05 + box.height / 2;
+	await page.mouse.move(x, y);
+	const inspector = page.locator('#fieldInspector');
+	await expect(inspector).toBeVisible();
+	await expect(inspector).toHaveText('(x, y) = (1.25, -0.50)\nF(x, y) = ⟨0.50, 1.25⟩\n|F| = 1.35');
+	await expect(page.locator('#paintHud')).toHaveClass(/visible/);
+	await page.locator('#notationSelect').selectOption('basis');
+	await expect(inspector).toHaveText('(x, y) = (1.25, -0.50)\nF(x, y) = 0.50 i + 1.25 j\n|F| = 1.35');
+
+	await canvas.dispatchEvent('pointermove', {
+		pointerType: 'mouse',
+		clientX: box.x + box.width - 2,
+		clientY: box.y + box.height - 2,
+	});
+	await expect(inspector).toBeVisible();
+	const tooltipBox = await inspector.boundingBox();
+	if (!tooltipBox) throw new Error('Inspector has no bounding box');
+	expect(tooltipBox.x).toBeGreaterThanOrEqual(box.x);
+	expect(tooltipBox.y).toBeGreaterThanOrEqual(box.y);
+	expect(tooltipBox.x + tooltipBox.width).toBeLessThanOrEqual(box.x + box.width);
+	expect(tooltipBox.y + tooltipBox.height).toBeLessThanOrEqual(box.y + box.height);
+
+	await page.goto('/?fx=1%2Fx&fy=1%2Fy');
+	const singularBox = await page.locator('#plane').boundingBox();
+	if (!singularBox) throw new Error('Canvas has no bounding box');
+	await page.mouse.move(singularBox.x + singularBox.width / 2, singularBox.y + singularBox.height / 2);
+	await expect(inspector).toHaveText('(x, y) = (0.00, 0.00)\nF(x, y) = undefined\n|F| = undefined');
+});
+
+test('suppresses inspection while painting, panning, editing, or disabled', async ({ page }, testInfo) => {
+	test.skip(testInfo.project.name === 'mobile', 'Touch inspection is intentionally deferred');
+	await page.goto('/');
+	const canvas = page.locator('#plane');
+	const box = await canvas.boundingBox();
+	if (!box) throw new Error('Canvas has no bounding box');
+	const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+	const inspector = page.locator('#fieldInspector');
+	await page.mouse.move(center.x, center.y);
+	await expect(inspector).toBeVisible();
+
+	await page.mouse.down();
+	await expect(inspector).toBeHidden();
+	await page.mouse.up();
+	await expect(inspector).toBeVisible();
+	await page.keyboard.down('Space');
+	await page.mouse.down();
+	await page.mouse.move(center.x + 20, center.y + 20);
+	await expect(inspector).toBeHidden();
+	await page.mouse.up();
+	await page.keyboard.up('Space');
+
+	await page.locator('#partX').click();
+	await page.mouse.move(center.x, center.y);
+	await expect(inspector).toBeHidden();
+	await page.locator('#partX input').fill('unknown');
+	await page.locator('#partX input').evaluate(input => input.blur());
+	await expect(inspector).toBeVisible();
+
+	await openSettings(page);
+	await page.locator('#toggleInspector').click();
+	await expect(page.locator('#toggleInspector')).toHaveAttribute('aria-pressed', 'false');
+	await page.reload();
+	await openSettings(page);
+	await expect(page.locator('#toggleInspector')).toHaveAttribute('aria-pressed', 'false');
+	await page.mouse.move(center.x, center.y);
+	await expect(inspector).toBeHidden();
 });
 
 test('switches notation without changing the active field', async ({ page }) => {
@@ -422,6 +498,7 @@ test('pinch zoom changes scale without painting', async ({ page, context }, test
 		return range ? (range[0] + range[1]) / 2 : null;
 	}).toBeCloseTo(-150 / box.width, 1);
 	await expect(page.locator('#paintHud')).toHaveClass(/visible/);
+	await expect(page.locator('#fieldInspector')).toBeHidden();
 });
 
 test('drawer touches do not become ghost canvas touches', async ({ page, context }, testInfo) => {
@@ -447,4 +524,5 @@ test('drawer touches do not become ghost canvas touches', async ({ page, context
 
 	await expect(page.locator('#zoomHud')).toHaveText(initialRange ?? '');
 	await expect(page.locator('#paintHud')).not.toHaveClass(/visible/);
+	await expect(page.locator('#fieldInspector')).toBeHidden();
 });
