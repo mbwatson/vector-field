@@ -471,6 +471,34 @@ test('share copies a field-only URL', async ({ page, context, browserName }) => 
 	await expect([...copied.searchParams.keys()]).toEqual(['fx', 'fy']);
 });
 
+test('exports the canvas backing store as PNG without changing simulator state', async ({ page }) => {
+	await page.goto('/?fx=-y&fy=x');
+	const canvas = page.locator('#plane');
+	const dimensions = await canvas.evaluate(element => ({
+		width: element.width,
+		height: element.height,
+	}));
+	await page.locator('#playPause').click();
+	await page.locator('#toggleInspector').click();
+	await page.keyboard.press('l');
+
+	const [download] = await Promise.all([
+		page.waitForEvent('download'),
+		page.locator('#exportPng').click(),
+	]);
+	expect(download.suggestedFilename()).toMatch(/^vector-field-\d{4}-\d{2}-\d{2}\.png$/);
+	const stream = await download.createReadStream();
+	const chunks = [];
+	for await (const chunk of stream) chunks.push(chunk);
+	const png = Buffer.concat(chunks);
+	expect([...png.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+	expect(png.readUInt32BE(16)).toBe(dimensions.width);
+	expect(png.readUInt32BE(20)).toBe(dimensions.height);
+	await expect(page.locator('#playPause')).toContainText('Pause');
+	await expect(page.locator('#toggleInspector')).toHaveAttribute('aria-pressed', 'true');
+	await expect(page.locator('#toggleGrid')).toHaveAttribute('aria-pressed', 'false');
+});
+
 test('supports pointer painting, panning, and zooming without page errors', async ({ page }, testInfo) => {
 	const errors = [];
 	page.on('pageerror', error => errors.push(error.message));

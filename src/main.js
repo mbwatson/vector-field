@@ -79,6 +79,7 @@ let currentXExpr, currentYExpr, currentXLatex, currentYLatex;
 let playPauseButton;
 let clearButton;
 let respawnButton;
+let exportButton;
 let shareButton;
 let toggleParticlesButton;
 let toggleVectorsButton;
@@ -957,6 +958,38 @@ async function copyShareLink() {
 	}, 1500);
 }
 
+function exportCanvasPng() {
+	exportButton.disabled = true;
+	exportButton.setAttribute('aria-busy', 'true');
+	planeCanvas.toBlob((blob) => {
+		exportButton.disabled = false;
+		exportButton.removeAttribute('aria-busy');
+		if (!blob) {
+			console.error('Canvas PNG export failed: the browser returned no image data.');
+			exportButton.innerHTML = '<i class="fas fa-exclamation-triangle" aria-hidden="true"></i> <span>Export failed</span>';
+			exportButton.title = 'PNG export failed';
+			exportButton.setAttribute('aria-label', 'PNG export failed');
+		} else {
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = `vector-field-${new Date().toISOString().slice(0, 10)}.png`;
+			document.body.appendChild(link);
+			link.click();
+			link.remove();
+			setTimeout(() => URL.revokeObjectURL(url), 0);
+			exportButton.innerHTML = '<i class="fas fa-check" aria-hidden="true"></i> <span>Exported</span>';
+			exportButton.title = 'PNG exported';
+			exportButton.setAttribute('aria-label', 'PNG exported');
+		}
+		setTimeout(() => {
+			exportButton.innerHTML = '<i class="fas fa-download" aria-hidden="true"></i> <span>Export PNG</span>';
+			exportButton.title = 'Export canvas as PNG';
+			exportButton.setAttribute('aria-label', 'Export canvas as PNG');
+		}, 1500);
+	}, 'image/png');
+}
+
 function beginEdit(part) {
 	const span = part === 'x' ? partXEl : partYEl;
 	if (span.querySelector('.fn-edit')) return; // already editing
@@ -1050,6 +1083,7 @@ function setupUI(initialVectorFunction) {
 	playPauseButton = document.getElementById('playPause');
 	clearButton = document.getElementById('clearParticles');
 	respawnButton = document.getElementById('respawnParticles');
+	exportButton = document.getElementById('exportPng');
 	shareButton = document.getElementById('shareLink');
 	
 	toggleParticlesButton = document.getElementById('toggleParticles');
@@ -1072,6 +1106,7 @@ function setupUI(initialVectorFunction) {
 		system.respawn();
 		requestParticleRender();
 	});
+	exportButton.addEventListener('click', exportCanvasPng);
 	shareButton.addEventListener('click', copyShareLink);
 
 	const openHelpButton = document.getElementById('openHelpBtn');
