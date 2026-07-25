@@ -277,7 +277,7 @@ test('switches notation without changing the active field', async ({ page }) => 
 	await openSettings(page);
 	await page.locator('#notationSelect').selectOption('basis');
 	await expect(page.locator('.function-panel')).toHaveAttribute('data-notation', 'basis');
-	await expect(page.locator('.fn-coordinate-x .notation-basis')).toBeVisible();
+	await expect(page.locator('.function-meta .notation-basis')).toBeVisible();
 	await expect(page.locator('.notation-component').first()).toBeHidden();
 	await expect(page.locator('#partX')).toHaveAttribute('aria-label', 'Edit i component');
 	await expect(page.locator('#partY')).toHaveAttribute('aria-label', 'Edit j component');
@@ -295,18 +295,18 @@ test('switches notation without changing the active field', async ({ page }) => 
 	await expect(page.locator('.function-panel')).toHaveAttribute('data-notation', 'basis');
 });
 
-test('stacks long editable components at mobile widths', async ({ page }) => {
+test('gives long editable components their own header rows', async ({ page }) => {
 	const first = 'sin(x)+cos(y)+x^2+y^2+sqrt(abs(x*y))';
 	const second = 'x^3-3*x*y^2+sin(x+y)+cos(x-y)';
 	await page.goto(`/?fx=${encodeURIComponent(first)}&fy=${encodeURIComponent(second)}`);
 	await expect(page.locator('#plane')).toBeVisible();
-	const firstBox = await page.locator('.fn-coordinate-x').boundingBox();
-	const secondBox = await page.locator('.fn-coordinate-y').boundingBox();
-	if (!firstBox || !secondBox) throw new Error('Function components have no bounding box');
-	await expect.poll(() => page.evaluate(() => window.innerWidth)).toBeGreaterThan(0);
-	if ((await page.evaluate(() => window.innerWidth)) <= 520) {
-		expect(secondBox.y).toBeGreaterThan(firstBox.y);
-	}
+	const firstBox = await page.locator('.function-component-x').boundingBox();
+	const secondBox = await page.locator('.function-component-y').boundingBox();
+	const headerBox = await page.locator('#mathHeader').boundingBox();
+	if (!firstBox || !secondBox || !headerBox) throw new Error('Function header has no bounding box');
+	expect(secondBox.y).toBeGreaterThan(firstBox.y);
+	expect(secondBox.y + secondBox.height).toBeLessThanOrEqual(headerBox.y + headerBox.height);
+	expect(headerBox.height).toBeLessThanOrEqual(100);
 	await page.locator('#partX').click();
 	await expect(page.locator('#partX input')).toHaveValue(first);
 	const editorBox = await page.locator('#partX').boundingBox();

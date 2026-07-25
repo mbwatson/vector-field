@@ -213,7 +213,7 @@ canvas {
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-color);
   border-width: 0 0 1px 0;
-  padding: 12px 20px;
+  padding: 0 20px;
   text-align: center;
   box-shadow: var(--shadow-panel);
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
@@ -240,20 +240,19 @@ canvas {
 
 .function-editor-row {
   display: grid;
-  grid-template-columns: minmax(90px, 1fr) minmax(0, auto) minmax(90px, 1fr);
+  grid-template-columns: minmax(1rem, 1fr) minmax(0, 760px) minmax(110px, 1fr);
   align-items: center;
   width: 100%;
 }
 
 .function-panel {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  display: grid;
+  width: 100%;
   min-width: 0;
-  font-size: 1.35rem;
+  font-size: 1rem;
   font-family: var(--font-mono);
   color: var(--text-main);
-  gap: 0;
+  text-align: left;
 }
 
 .preset-trigger {
@@ -262,15 +261,43 @@ canvas {
   white-space: nowrap;
 }
 
-.function-expression,
-.fn-coordinate {
-  display: inline-flex;
+.function-meta {
+  overflow: hidden;
+  color: var(--text-muted);
+  filter: opacity(0.5);
+  font-size: 0.62rem;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.function-meta b {
+  color: var(--text-main);
+  font-style: normal;
+}
+
+.function-component {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
+  gap: 7px;
   min-width: 0;
+}
+
+.function-component-label {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  white-space: nowrap;
 }
 
 .notation-basis {
   display: none;
+}
+
+.function-panel .notation-component {
+  color: var(--text-muted);
 }
 
 .function-panel[data-notation="basis"] .notation-component {
@@ -281,37 +308,15 @@ canvas {
   display: inline;
 }
 
-.fn-notation {
-  color: var(--text-muted);
-  font-size: 1.1rem;
-  margin-right: 6px;
-}
-
-.fn-bracket {
-  color: var(--color-accent);
-  font-weight: 500;
-}
-
-.fn-comma {
-  color: var(--text-muted);
-  margin-right: 4px;
-}
-
-.fn-basis {
-  color: var(--text-muted);
-  margin: 0 5px 0 1px;
-  white-space: nowrap;
-}
-
 .fn-part {
   cursor: pointer;
-  display: inline-block;
-  padding: 1px 6px;
+  display: block;
+  width: 100%;
+  padding: 2px;
   border-radius: 6px;
   border: 1px dashed transparent;
   transition: background-color 0.2s, border-color 0.2s;
   min-width: 25px;
-  /*max-width: min(34vw, 190px);*/
   overflow-x: auto;
   overflow-y: hidden;
   white-space: nowrap;
@@ -335,7 +340,7 @@ canvas {
   border-radius: 6px;
   padding: 2px 6px;
   font-family: var(--font-mono);
-  font-size: 1.2rem;
+  font-size: 1.0rem;
   text-align: center;
   outline: none;
   box-shadow: 0 0 8px rgba(0, 242, 254, 0.2);
@@ -1210,7 +1215,7 @@ input[type="range"]::-moz-range-thumb:hover {
   /* Adjust floating header width and size */
   .floating-header {
     min-height: 88px;
-    padding: 10px 12px;
+    padding: 0 12px;
   }
 
   .hud-btn {
@@ -1223,11 +1228,11 @@ input[type="range"]::-moz-range-thumb:hover {
   }
 
   .function-panel {
-    font-size: 1.05rem;
+    font-size: 0.95rem;
   }
 
   .function-editor-row {
-    grid-template-columns: 42px minmax(0, 1fr) 42px;
+    grid-template-columns: 1rem minmax(0, 1fr) 60px;
   }
 
   .preset-trigger {
@@ -1242,12 +1247,16 @@ input[type="range"]::-moz-range-thumb:hover {
     display: none;
   }
 
-  .fn-notation {
-    font-size: 0.95rem;
+  .function-meta {
+    font-size: 0.58rem;
   }
 
-  .fn-part {
-    max-width: 58vw;
+  .function-component {
+    gap: 5px;
+  }
+
+  .function-component-label {
+    font-size: 0.68rem;
   }
 
   .hud-overlay {
@@ -1331,53 +1340,6 @@ input[type="range"]::-moz-range-thumb:hover {
 }
 
 @media (max-width: 520px) {
-  .function-panel {
-    align-items: flex-start;
-    text-align: left;
-  }
-
-  .fn-notation {
-    flex: 0 0 auto;
-    margin-top: 3px;
-  }
-
-  .function-expression {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-rows: auto auto;
-    align-items: center;
-    min-width: 0;
-  }
-
-  .function-expression > .fn-bracket:first-child {
-    grid-column: 1;
-    grid-row: 1 / 3;
-  }
-
-  .fn-coordinate-x {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  .fn-coordinate-y {
-    grid-column: 2;
-    grid-row: 2;
-  }
-
-  .function-expression > .fn-bracket:last-child {
-    grid-column: 3;
-    grid-row: 1 / 3;
-  }
-
-  .function-panel[data-notation="basis"] .function-expression {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .function-panel[data-notation="basis"] .fn-coordinate-x,
-  .function-panel[data-notation="basis"] .fn-coordinate-y {
-    grid-column: 1;
-  }
-
   .vector-preset-grid {
     grid-template-columns: minmax(0, 1fr);
   }

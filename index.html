@@ -36,20 +36,19 @@
         <div class="function-editor-row">
           <span class="function-editor-spacer" aria-hidden="true"></span>
           <div class="function-panel" data-notation="component">
-            <span class="fn-notation">F(x,y) =</span>
-            <span class="function-expression">
-              <span class="fn-bracket notation-component" aria-hidden="true">&#10216;</span>
-              <span class="fn-coordinate fn-coordinate-x">
-                <span class="fn-part" id="partX" tabindex="0" role="button" aria-label="Edit X component" title="Click to edit"></span>
-                <span class="fn-comma notation-component" aria-hidden="true">,</span>
-                <span class="fn-basis notation-basis" aria-hidden="true"><i>i</i> +</span>
-              </span>
-              <span class="fn-coordinate fn-coordinate-y">
-                <span class="fn-part" id="partY" tabindex="0" role="button" aria-label="Edit Y component" title="Click to edit"></span>
-                <span class="fn-basis notation-basis" aria-hidden="true"><i>j</i></span>
-              </span>
-              <span class="fn-bracket notation-component" aria-hidden="true">&#10217;</span>
-            </span>
+            <div class="function-meta" aria-hidden="true">
+              <span class="notation-component">
+                <i>F</i>(x,y) = <strong>&#10216;</strong><i>P</i>(x,y), <i>Q</i>(x,y)<strong>&#10217;</strong></span>
+              <span class="notation-basis"><i>F</i>(x,y) = <i>P</i>(x,y)<b>i</b> + <i>Q</i>(x,y)<b>j</b></span>
+            </div>
+            <div class="function-component function-component-x">
+              <span class="function-component-label" aria-hidden="true"><i>P</i>(x,y) =</span>
+              <span class="fn-part" id="partX" tabindex="0" role="button" aria-label="Edit X component" title="Click to edit"></span>
+            </div>
+            <div class="function-component function-component-y">
+              <span class="function-component-label" aria-hidden="true"><i>Q</i>(x,y) =</span>
+              <span class="fn-part" id="partY" tabindex="0" role="button" aria-label="Edit Y component" title="Click to edit"></span>
+            </div>
           </div>
           <button id="openPresetsBtn" class="btn btn-action preset-trigger" type="button" aria-haspopup="dialog" aria-controls="presetDialog">
             <i class="fas fa-th-large" aria-hidden="true"></i>
